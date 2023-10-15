@@ -11,7 +11,7 @@ import (
 	"github.com/elastic/elastic-transport-go/v8/elastictransport"
 	elasticsearch "github.com/elastic/go-elasticsearch/v7"
 	"github.com/elastic/go-elasticsearch/v7/esutil"
-	"github.com/op/go-logging"
+	"github.com/je4/utils/v2/pkg/zLogger"
 	"go.elastic.co/apm/module/apmelasticsearch"
 	"net/http"
 	"os"
@@ -23,14 +23,14 @@ import (
 type Indexer7 struct {
 	index           string
 	es              *elasticsearch.Client
-	log             *logging.Logger
+	log             zLogger.ZLogger
 	start           time.Time
 	bi              esutil.BulkIndexer
 	countSuccessful uint64
 	countError      uint64
 }
 
-func NewIndexer7(address string, index string, logger *logging.Logger) (Indexer, error) {
+func NewIndexer7(address string, index string, logger zLogger.ZLogger) (Indexer, error) {
 	var err error
 	idx := &Indexer7{
 		index: index,
@@ -73,7 +73,7 @@ func NewIndexer7(address string, index string, logger *logging.Logger) (Indexer,
 
 	idx.es, err = elasticsearch.NewClient(cfg)
 	if err != nil {
-		logger.Fatal(err)
+		logger.Fatal().Err(err)
 	}
 	return idx, nil
 }
@@ -158,7 +158,7 @@ func (idx *Indexer7) CloseBulk() error {
 
 	// Report the results: number of indexed docs, number of errors, duration, indexing rate
 	//
-	idx.log.Info(strings.Repeat("▔", 65))
+	idx.log.Info().Msg(strings.Repeat("▔", 65))
 
 	dur := time.Since(idx.start)
 
@@ -170,12 +170,12 @@ func (idx *Indexer7) CloseBulk() error {
 			dur.Truncate(time.Millisecond),
 			humanize.Comma(int64(1000.0/float64(dur/time.Millisecond)*float64(biStats.NumFlushed))),
 		)
-		idx.log.Infof(msg)
+		idx.log.Info().Msgf(msg)
 		return errors.Errorf(
 			msg,
 		)
 	} else {
-		idx.log.Infof(
+		idx.log.Info().Msgf(
 			"Sucessfuly indexed [%s] documents in %s (%s docs/sec)",
 			humanize.Comma(int64(biStats.NumFlushed)),
 			dur.Truncate(time.Millisecond),
@@ -199,19 +199,19 @@ func (idx *Indexer7) Delete(id string) error {
 			// OnSuccess is called for each successful operation
 			OnSuccess: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem) {
 				atomic.AddUint64(&idx.countSuccessful, 1)
-				idx.log.Infof("%s: %s", item.Action, item.DocumentID)
+				idx.log.Info().Msgf("%s: %s", item.Action, item.DocumentID)
 			},
 
 			// OnFailure is called for each failed operation
 			OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
 				atomic.AddUint64(&idx.countError, 1)
 				if err != nil {
-					idx.log.Errorf("%s", err)
+					idx.log.Error().Msgf("%s", err)
 				} else {
 					if res.Error.Type != "" {
-						idx.log.Errorf("%s: %s", res.Error.Type, res.Error.Reason)
+						idx.log.Error().Msgf("%s: %s", res.Error.Type, res.Error.Reason)
 					} else {
-						idx.log.Errorf("[%v] %s - %s - %s", res.Status, item.Action, item.DocumentID, res.Result)
+						idx.log.Error().Msgf("[%v] %s - %s - %s", res.Status, item.Action, item.DocumentID, res.Result)
 					}
 				}
 			},
@@ -258,9 +258,9 @@ func (idx *Indexer7) Index(id string, doc any) error {
 			OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
 				atomic.AddUint64(&idx.countError, 1)
 				if err != nil {
-					idx.log.Infof("ERROR: %s", err)
+					idx.log.Info().Msgf("ERROR: %s", err)
 				} else {
-					idx.log.Infof("ERROR: %s: %s", res.Error.Type, res.Error.Reason)
+					idx.log.Info().Msgf("ERROR: %s: %s", res.Error.Type, res.Error.Reason)
 				}
 			},
 		},
