@@ -30,7 +30,7 @@ type Indexer7 struct {
 	countError      uint64
 }
 
-func NewIndexer7(address string, index string, logger zLogger.ZLogger) (Indexer, error) {
+func NewIndexer7(addresses []string, index string, logger zLogger.ZLogger) (Indexer, error) {
 	var err error
 	idx := &Indexer7{
 		index: index,
@@ -44,9 +44,7 @@ func NewIndexer7(address string, index string, logger zLogger.ZLogger) (Indexer,
 	retryBackoff := backoff.NewExponentialBackOff()
 
 	cfg := elasticsearch.Config{
-		Addresses: []string{
-			address,
-		},
+		Addresses: addresses,
 		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 		// ... using the "apmelasticsearch" wrapper for instrumentation
 		Transport: apmelasticsearch.WrapRoundTripper(http.DefaultTransport),

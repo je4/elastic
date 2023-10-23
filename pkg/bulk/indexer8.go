@@ -31,7 +31,7 @@ type Indexer8 struct {
 	countError      uint64
 }
 
-func NewIndexer8(address string, index string, apikey string, logger zLogger.ZLogger) (Indexer, error) {
+func NewIndexer8(addresses []string, index string, apikey string, logger zLogger.ZLogger) (Indexer, error) {
 	var err error
 	idx := &Indexer8{
 		index: index,
@@ -45,10 +45,8 @@ func NewIndexer8(address string, index string, apikey string, logger zLogger.ZLo
 	retryBackoff := backoff.NewExponentialBackOff()
 
 	cfg := elasticsearch.Config{
-		APIKey: apikey,
-		Addresses: []string{
-			address,
-		},
+		APIKey:    apikey,
+		Addresses: addresses,
 		// >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 		// ... using the "apmelasticsearch" wrapper for instrumentation
 		Transport: apmelasticsearch.WrapRoundTripper(http.DefaultTransport),
