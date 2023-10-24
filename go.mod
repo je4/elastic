@@ -1,6 +1,6 @@
 module github.com/je4/elastic/v2
 
-go 1.21.0
+go 1.21
 
 require (
 	emperror.dev/errors v0.8.1
