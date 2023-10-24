@@ -237,6 +237,51 @@ func (idx *Indexer8) Delete(id string) error {
 	}
 	return nil
 }
+func (idx *Indexer8) DeleteByQuery(fld, val string) error {
+	var q = fmt.Sprintf(`
+	"query": {
+		"match": {
+			"%s": "%s"
+		}
+	}`, fld, val)
+	if err := idx.bi.Add(
+		context.Background(),
+		esutil.BulkIndexerItem{
+			// Action field configures the operation to perform (index, create, delete, update)
+			Action: "delete",
+
+			Index: idx.index,
+
+			// DocumentID is the (optional) document ID
+			DocumentID: "",
+
+			Body: bytes.NewReader([]byte(q)),
+
+			// OnSuccess is called for each successful operation
+			OnSuccess: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem) {
+				atomic.AddUint64(&idx.countSuccessful, 1)
+				idx.log.Info().Msgf("%s: %s", item.Action, res.DocumentID)
+			},
+
+			// OnFailure is called for each failed operation
+			OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
+				atomic.AddUint64(&idx.countError, 1)
+				if err != nil {
+					idx.log.Error().Msgf("%s", err)
+				} else {
+					if res.Error.Type != "" {
+						idx.log.Error().Msgf("%s: %s", res.Error.Type, res.Error.Reason)
+					} else {
+						idx.log.Error().Msgf("[%v] %s - %s - %s", res.Status, item.Action, res.DocumentID, res.Result)
+					}
+				}
+			},
+		},
+	); err != nil {
+		return errors.Wrapf(err, "cannot delete document %s:%s", fld, val)
+	}
+	return nil
+}
 
 func (idx *Indexer8) Index(id string, doc any) error {
 	if doc == nil {
