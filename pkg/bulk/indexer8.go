@@ -142,8 +142,15 @@ func (idx *Indexer8) CreateIndex(schema []byte) error {
 	return nil
 }
 
+type DebugLogger bool
+
+func (DebugLogger) Printf(format string, v ...interface{}) {
+	fmt.Printf(format, v...)
+}
+
 func (idx *Indexer8) StartBulk(workers int, flushbytes int, flushtime time.Duration) error {
 	var err error
+	//	logger := DebugLogger(true)
 	idx.start = time.Now()
 	idx.bi, err = esutil.NewBulkIndexer(esutil.BulkIndexerConfig{
 		Index:         idx.index,  // The default index name
@@ -151,7 +158,7 @@ func (idx *Indexer8) StartBulk(workers int, flushbytes int, flushtime time.Durat
 		NumWorkers:    workers,    // The number of worker goroutines
 		FlushBytes:    flushbytes, // The flush threshold in bytes
 		FlushInterval: flushtime,  // The periodic flush interval
-		//DebugLogger:   &esLogger{logger},
+		//DebugLogger:   logger,    // The logger
 	})
 	if err != nil {
 		return errors.Wrap(err, "cannot initialize bulk indexer")
@@ -237,52 +244,6 @@ func (idx *Indexer8) Delete(id string) error {
 	}
 	return nil
 }
-func (idx *Indexer8) DeleteByQuery(fld, val string) error {
-	var q = fmt.Sprintf(`
-	"query": {
-		"match": {
-			"%s": "%s"
-		}
-	}`, fld, val)
-	if err := idx.bi.Add(
-		context.Background(),
-		esutil.BulkIndexerItem{
-			// Action field configures the operation to perform (index, create, delete, update)
-			Action: "delete",
-
-			Index: idx.index,
-
-			// DocumentID is the (optional) document ID
-			DocumentID: "",
-
-			Body: bytes.NewReader([]byte(q)),
-
-			// OnSuccess is called for each successful operation
-			OnSuccess: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem) {
-				atomic.AddUint64(&idx.countSuccessful, 1)
-				idx.log.Info().Msgf("%s: %s", item.Action, res.DocumentID)
-			},
-
-			// OnFailure is called for each failed operation
-			OnFailure: func(ctx context.Context, item esutil.BulkIndexerItem, res esutil.BulkIndexerResponseItem, err error) {
-				atomic.AddUint64(&idx.countError, 1)
-				if err != nil {
-					idx.log.Error().Msgf("%s", err)
-				} else {
-					if res.Error.Type != "" {
-						idx.log.Error().Msgf("%s: %s", res.Error.Type, res.Error.Reason)
-					} else {
-						idx.log.Error().Msgf("[%v] %s - %s - %s", res.Status, item.Action, res.DocumentID, res.Result)
-					}
-				}
-			},
-		},
-	); err != nil {
-		return errors.Wrapf(err, "cannot delete document %s:%s", fld, val)
-	}
-	return nil
-}
-
 func (idx *Indexer8) Index(id string, doc any) error {
 	if doc == nil {
 		return errors.Errorf("document %s is nil", id)

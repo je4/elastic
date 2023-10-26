@@ -8,6 +8,5 @@ type Indexer interface {
 	StartBulk(workers int, flushbytes int, flushtime time.Duration) error
 	CloseBulk() error
 	Delete(id string) error
-	DeleteByQuery(fld, val string) error
 	Index(id string, content any) error
 }
